@@ -1,0 +1,5 @@
+<map id="G" name="G">
+<area shape="rect" id="node2" href="$structstx_1_1CBTreeDB_1_1SignaturePage.html" title="Signature page which heads all cbtreedb files." alt="" coords="5,5,557,35"/>
+<area shape="rect" id="node4" href="$structstx_1_1CBTreeDB_1_1LeafNode.html" title="Leaf node structure of the B&#45;tree leaf pages." alt="" coords="21,59,541,88"/>
+<area shape="rect" id="node6" href="$structstx_1_1CBTreeDB_1_1InnerNode.html" title="Inner node structure of the B&#45;tree inner pages." alt="" coords="19,112,544,141"/>
+</map>

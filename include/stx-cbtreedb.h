@@ -223,7 +223,8 @@ protected:
 
 		/// file offset of value data associated with key.
 		uint32_t	offsets[LeafNodeNumKeys+1];
-	    };
+	    }
+		__attribute__((packed));
 
 	    /// union with filler char array to assure page size.
 	    char	filler[BTreePageSize - LeafNodeHead + sizeof(uint32_t)];
@@ -621,7 +622,7 @@ protected:
 	    if (position)
 	    {
 		memcpy(buffer + position, input,
-		       std::min(length, sizeof(buffer) - position));
+		       std::min<u32bit>(length, sizeof(buffer) - position));
 
 		if(position + length >= HASH_BLOCK_SIZE)
 		{
@@ -640,7 +641,7 @@ protected:
 	    }
 
 	    memcpy(buffer + position, input,
-		   std::min(length, sizeof(buffer) - position));
+		   std::min<u32bit>(length, sizeof(buffer) - position));
 
 	    position += length;
 	}
@@ -986,7 +987,7 @@ protected:
 	{
 	    // since hot pageids are usually ascending, I guess this is a
 	    // pretty good hash function.
-	    return (reinterpret_cast<uint32_t>(btreeid) + pageid) % m_hasharray.size();
+	    return (reinterpret_cast<uintptr_t>(btreeid) + pageid) % m_hasharray.size();
 	}
 
     public:
@@ -1093,7 +1094,7 @@ protected:
 		    CBTREEDB_ASSERT( lc != &m_sentinel );
 
 		    // unlink from bucket list
-		    if (reinterpret_cast<uint32_t>(lc->bucket_prev) > m_hasharray.size())
+		    if (reinterpret_cast<uintptr_t>(lc->bucket_prev) > m_hasharray.size())
 		    {
 			if (lc->bucket_next)
 			    lc->bucket_next->bucket_prev = lc->bucket_prev;
@@ -1105,7 +1106,7 @@ protected:
 			if (lc->bucket_next)
 			    lc->bucket_next->bucket_prev = lc->bucket_prev;
 
-			m_hasharray[ reinterpret_cast<uint32_t>(lc->bucket_prev) ] = lc->bucket_next;
+			m_hasharray[ reinterpret_cast<uintptr_t>(lc->bucket_prev) ] = lc->bucket_next;
 		    }
 
 		    // unlink from LRU list
@@ -1279,7 +1280,7 @@ protected:
 
 		    if (!hc) continue;
 
-		    if (!(reinterpret_cast<uint32_t>(hc->bucket_prev) == b)) return false;
+		    if (!(reinterpret_cast<uintptr_t>(hc->bucket_prev) == b)) return false;
 
 		    ++size;
 
