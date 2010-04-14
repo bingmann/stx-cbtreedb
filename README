@@ -1,0 +1,312 @@
+ *** stx::CBTreeDB - STX Constant B-Tree Database Template Classes README ***
+
+Author: Timo Bingmann (Mail: tb a-with-circle idlebox dot net)
+Date: 2010-04-09
+
+--- Summary ---
+
+The stx::CBTreeDB is a collection of C++ classes with which read-only key-value
+database files can be created and read. A database efficiently maps a large
+number of integral fixed-length keys to opaque binary value
+blobs. Variable-length or duplicate keys are currently not supported. Keys are
+organized into a highly compact index structure, which is very similar to a
+B-tree and allows very fast key lookups. Both keys and values are stored in
+order and thus queries in a local proximity can benefit from caching
+effects. All applications mapping a large number of constant, integral keys to
+string or data blobs can benefit from this library.
+
+Key features of the database classes are:
+
+ * key locality due to ordered storage of keys and values
+ * lookups in close proximity benefit from caching effects
+ * fixed-length integral keys
+ * opaque binary blobs as values
+ * compact B-tree-like index structure
+ * sequential storage of value data with minimal overhead
+ * O(1) page cache to keep hot pages in memory
+ * simple C++ API for Reader and two Writer classes
+ * CRC32 checksum of header and SHA256 digest of b-tree and value data for
+   integrity
+ * extensive test suite with 91.3% coverage
+
+The complete source code is contained in the header file
+include/stx-cbtreedb.h.
+
+--- Website / API Docs / Bugs / License ---
+
+The current source package can be downloaded from
+http://idlebox.net/2010/stx-cbtreedb/
+
+The classes are extensively documented using doxygen. The compiled doxygen HTML
+documentation is included in the source package or can be viewed online at
+http://idlebox.net/2010/stx-cbtreedb/stx-cbtreedb-0.7.0/doxygen-html/ (if you
+are not reading it right now).
+
+The tools directory contains an example1.cc, which is further documented below
+(Example Usage) and an all-purpose cbtreedb-tool for use with standard database
+formats.
+
+If bugs should become known they will be posted on the above web page together
+with patches or corrected versions.
+
+The B-tree source code is released under the GNU Lesser General Public License
+v2.1 (LGPL) which can be found in the file COPYING. Other parts of the source
+code were copied from the Botan library and are under a BSD-license.
+
+--- Original Application ---
+
+The original purpose of this library is to organize lookups of 32-bit integer
+identifiers to constant data blobs. In my application a few million
+non-sequential identifier keys are mapping to data blobs, which are unalterable
+short strings or small (1-10 kb) data files. Most key lookups occur in close
+proximity, usually in ascending order.
+
+The resulting data volume is around 20 GB in size and was previously stored
+using the BerkeleyDB library. However, since the key and values in my
+application are read-only, the overhead both in file size and processing time
+introduced by BerkeleyDB became unacceptable. Using stx::CBTreeDB access to the
+value records is faster than before, and file sizes were reduced to a minimum
+due to the compact sequential storage in the read-only databases.
+
+An alternative to the B-tree database classes are the well-known cdb or tinycdb
+libraries. However, these are basically hash tables and thus do not preserve
+key locality. Thus retrieval of 10 keys in ascending order requires 10 disk
+accesses at pseudo-random places in the database. With the B-tree library the
+disk areas read are stored in ascending order, just like the keys.
+
+--- Design Principles and Database Architecture ---
+
+Most design principles follow directly from the intended application.
+
+Maybe the most important design aspect was to store the data blobs without
+separation in the most compact way possible. Thus the read-only database file
+simply stores all data blobs in sequence, without putting them onto data pages
+or similar overhead typical of a read-write database.
+
+To accelerate key lookups an index structure very similar to a B-tree is
+prepended to the data area. This "packed, sequential" B-tree is constructed by
+the Writer classes and only differs from the original B-tree in one aspect. The
+nodes of each level containing the highest keys may be less than half full. The
+basic idea of the "packed, sequential" B-tree is to use only full nodes and
+creating inner nodes and levels as needed. All nodes except the one with the
+highest key are full! Thus the number of nodes used by the search tree is
+minimal and all lookup properties of the B-tree are retained. A drawing of the
+B-tree structure can be seen below:
+
+		  Structure of the packed, sequential B-tree
+			[See doxygen-html/drawing2-svg]
+
+All B-tree nodes are stored "in order" after the database file's header. The
+root node is always first, followed by all nodes of the next level, which in
+turn are followed by the next level until the leaf level is reached.
+
+See the corresponding structures for the data fields in these nodes:
+stx::CBTreeDB::InnerNode and stx::CBTreeDB::LeafNode. These structures use some
+less obvious optimizations to further reduce overhead:
+
+The in order storage of all B-tree nodes makes saving of offsets for each child
+node of an inner node unnecessary: the n+1 children nodes are stored
+consecutively starting after the first node. Thus the page offset of a child
+node can be calculated from only the first node's offset and the child
+number. This optimization removes about half of ordinarily needed fields in an
+inner node (stx::CBTreeDB::InnerNode) and allows a higher fan-out.
+
+Each leaf node (stx::CBTreeDB::LeafNode) contains both an array of keys and
+corresponding data offsets. For size optimization all data offsets are 32-bit
+values relative to a base 64-bit starting offset. This reduces the size of the
+offset array and allows more keys to fit into a leaf node. This also imposes a
+restriction on data size: the sum of all data handled by one leaf must not
+exceed 2^32. This constraint is currently unchecked by the library, but should
+not occur in practice. Data sizes are calculated from subsequent data
+offsets. Furthermore, each leaf node contains one more offset number than
+strictly necessary: the offset of the data item following the highest key in
+the leaf. This offset is used to calculate the data size for the highest key
+without requiring retrieval of the following leaf.
+
+--- Implementation Overview ---
+
+All classes of the cbtreedb library are enclosed in the top-level template
+class stx::CBTreeDB. This class is parametrized by two types and two integer
+values. See the class documentation for more information on the template
+parameters.
+
+The library contains two writer classes, which are used to create read-only
+databases from a set of key-value pairs. The difference between the two classes
+is the order in which key-value pairs are delivered to the class. The
+stx::CBTreeDB::Writer allows keys to be added in random order to the internal
+std::map. When finished the B-tree is constructed and the whole set is written
+to the database in one function call.
+
+The obvious problem with Writer is that with large databases all key-value data
+must be stored in memory until written. This prohibits use of this writer class
+for very large databases, which are a main goal of the library. For purpose of
+writing large databases the sequential writer class
+stx::CBTreeDB::WriterSequential can be used. With this writer the key sequence
+must be delivered in ascending order and the database is constructed in two
+phases: in the first phase key and value-lengths are declared and the B-tree is
+constructed, and in the second phase the key-value pairs are delivered and
+written directly to the file with no extra buffering.
+
+Note that both writer classes create _identical_ databases for equal input
+sets.
+
+There is only one stx::CBTreeDB::Reader class. The Reader class itself is a
+pointer implementation to a referenced counted implementation object
+(stx::CBTreeDB::ReaderImpl), so you can easily copy Reader objects. Note
+however, that non of the classes are reentrent or thread-safe. For
+multi-threaded applications access must be guarded by mutexes, patches welcome.
+
+Each Reader object may optionally have an associated stx::CBTreeDB::PageCache
+object, which is then used to cache hot B-tree pages like the root. The
+PageCache contains the most recently used pages (LRU replacement strategy) up
+to the maximum number specified. It features a structure allowing O(1) Store()
+and Retrieve() functions. A PageCache object can be shared between different
+database Readers. For more information see the corresponding documentation
+page.
+
+A Reader object can load exactly one database using the Open() function. Note
+that the class template parameters must match those used to write the
+database. Some parameters are checked by the Open() function and appropriate
+error messages are returned.
+
+Once opened the database can be queried using Exists(), Lookup(), GetIndex()
+and the operator[] functions as if it were a map.
+
+--- Test Suite ---
+
+The B-tree distribution contains an extensive test suite. According to gcov
+91.3% of the stx-cbtreedb.h implementation is covered. The remaining lines are
+all copies or unimportant.
+
+--- Example Usage ---
+
+These example snippets are based on code from tools/example1.cc
+
+Most programs will first use a typedef to specify the template parameters of
+stx::CBTreeDB. In this example simple uint32_t keys are used in ascending
+order:
+
+| // declare cbtreedb parameters
+| typedef stx::CBTreeDB< uint32_t, std::less<uint32_t> > cbtreedb;
+
+A read-only database can be created using stx::CBTreeDB::Writer as follows:
+
+| const unsigned int items = 64;
+| 
+| // create random order writer object
+| cbtreedb::Writer writer;
+| 
+| // add some key-values into writer map
+| for(unsigned int i = 0; i < items; ++i)
+| {
+|     std::ostringstream oss;
+|     oss << "value " << i;
+| 
+|     writer.Add(i * i, oss.str());
+| }
+| 
+| // write out database via ofstream
+| std::ofstream testdb("example1.db");
+| writer.Write(testdb);
+
+Once created the database file can be opened and read by a
+stx::CBTreeDB::Reader object. Note that the file ifstream must exist as long as
+the Reader is used.
+
+| // create reader object
+| cbtreedb::Reader reader;
+| 
+| // set up page cache to keep hot pages in memory
+| cbtreedb::PageCache cache(128);
+| reader.SetPageCache(&cache);
+| 
+| // attach an ifstream to the reader and open db
+| std::ifstream testdb("example1.db");
+| std::string errorstring;
+| if (!reader.Open(testdb, &errorstring))
+| {
+|     std::cout << "Error loading database: " << errorstring << std::endl;
+|     return -1;
+| }          
+
+The key-value pairs in the database can then be accessed by different
+functions.
+
+| // pick out some items via operator[]
+| std::cout << "sqrt(2500) -> " << reader[2500] << std::endl;
+| std::cout << "sqrt(2501) -> " << reader[2501] << std::endl;
+| std::cout << "sqrt(2601) -> " << reader[2601] << std::endl;
+| 
+| // check existance of keys
+| std::cout << "isSquare(2704) -> " << reader.Exists(2704) << std::endl;
+| std::cout << "isSquare(2705) -> " << reader.Exists(2705) << std::endl;
+| 
+| // full lookup function
+| std::string out;
+| 
+| if (reader.Lookup(2809, out))
+|     std::cout << "Lookup 2809 -> " << out << " (was found.)" << std::endl;
+| else
+|     std::cout << "Lookup 2809 has failed." << std::endl;
+
+All pairs can also be enumerated using the GetIndex() functions:
+
+| // iterate through all items in the database
+| std::cout << "Full listing:" << std::endl;
+| for(unsigned int i = 0; i < reader.Size(); ++i)
+| {
+|     uint32_t key;
+|     std::string value;
+|     
+|     reader.GetIndex(i, key, value);
+| 
+|     std::cout << "key " << key << " -> " << value << ", ";
+| }
+| std::cout << std::endl;
+
+Data integrity is protected by the database format using CRC32 and SHA256
+checksums of both B-tree keys and data area. The full database check is rather
+expensive and can be run using the Verify() function.
+
+| // run all internal checks
+| if (!reader.Verify())
+| {
+|     std::cout << "Database integrity failed!" << std::endl;
+| }
+
+When no longer needed the Reader object can either be destroyed or Close() can
+explicitly be called to release the file association.
+
+| // release file stream
+| reader.Close();
+
+Alternatively, the sequential order writer, stx::CBTreeDB::WriterSequential can
+be used to create the same database. Note that the value data is not necessary
+during phase 1.
+
+| const unsigned int items = 64;
+| 
+| // create sequential order writer object
+| cbtreedb::WriterSequential writer;
+| 
+| // phase 1: declare key and values lengths
+| for(unsigned int i = 0; i < items; ++i)
+| {
+|     writer.Add(i*i, strlen("value ") + (i > 0 ? (log10(i) + 1) : 1));
+| }
+| 
+| // write out header and B-tree to database via ofstream
+| std::ofstream testdb("example1.db");
+| writer.WriteHeader(testdb);
+| 
+| // phase 2: deliver key and value data
+| for(unsigned int i = 0; i < items; ++i)
+| {
+|     std::ostringstream oss;
+|     oss << "value " << i;
+| 
+|     writer.WriteValue(i*i, oss.str());
+| }
+| 
+| // finalize database by updating signature page
+| writer.WriteFinalize();
