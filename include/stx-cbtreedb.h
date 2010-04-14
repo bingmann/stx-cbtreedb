@@ -214,22 +214,26 @@ protected:
 	/// base of value offsets enumerated in array.
 	uint64_t	baseoffset;
 
-	/// key array of ascending key in this leaf.
-	key_type	keys[LeafNodeNumKeys];
+	union
+	{
+	    struct
+	    {
+		/// key array of ascending key in this leaf.
+		key_type	keys[LeafNodeNumKeys];
 
-	/// file offset of value data associated with key.
-	uint32_t	offsets[LeafNodeNumKeys+1];
+		/// file offset of value data associated with key.
+		uint32_t	offsets[LeafNodeNumKeys+1];
+	    };
 
-	/// unused zero filled bytes to fill the page
-	uint8_t		filler[LeafNodeFiller];
+	    /// union with filler char array to assure page size.
+	    char	filler[BTreePageSize - LeafNodeHead + sizeof(uint32_t)];
+	};
 
 	/// Initializes structure with zero.
 	inline explicit LeafNode()
 	    : level(0), slots(0), baseoffset(0)
 	{
-	    memset(keys, 0, sizeof(keys));
-	    memset(offsets, 0, sizeof(offsets));
-	    std::fill(filler+0, filler+sizeof(filler), 0);
+	    memset(filler, 0, sizeof(filler));
 	}
 
 	/// Returns true if no more keys can be added.
@@ -267,18 +271,20 @@ protected:
 	/// base offset of child B-tree nodes enumerated by keys.
 	uint32_t	childrenoffset;
 
-	/// key array of ascending keys in this inner node.
-	key_type	keys[InnerNodeNumKeys];
+	union
+	{
+	    /// key array of ascending keys in this inner node.
+	    key_type	keys[InnerNodeNumKeys];
 
-	/// unused zero filled bytes to fill the page
-	uint8_t		filler[InnerNodeFiller];
+	    /// union with filler char array to assure page size.
+	    char	filler[BTreePageSize - InnerNodeHead];
+	};
 
 	/// Initializes structure with zero.
 	inline explicit InnerNode(uint16_t level_)
-	    : level(level_), slots(0)
+	    : level(level_), slots(0), childrenoffset(0)
 	{
-	    memset(keys, 0, sizeof(keys));
-	    std::fill(filler+0, filler+sizeof(filler), 0);
+	    memset(filler, 0, sizeof(filler));
 	}
 
 	/// Returns true if no more keys can be added.
@@ -2676,6 +2682,7 @@ public:
 	/// be seekable, a simple ostream will not suffice.
 	void Write(std::ostream& os) const
 	{
+	    os.clear();
 	    os.seekp(0, std::ios::beg);
 
 	    // Write zeroed signature block to be overwritten when the file is

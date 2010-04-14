@@ -4,7 +4,7 @@ SUBDIRS = . testsuite tools
 
 include_HEADERS = include/stx-cbtreedb.h
 
-EXTRA_DIST = 
+EXTRA_DIST = Doxyfile mainpage.dox doxygen-html
 
 if GCOV
 

@@ -216,7 +216,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = . testsuite tools
 include_HEADERS = include/stx-cbtreedb.h
-EXTRA_DIST = 
+EXTRA_DIST = Doxyfile mainpage.dox doxygen-html
 all: all-recursive
 
 .SUFFIXES:

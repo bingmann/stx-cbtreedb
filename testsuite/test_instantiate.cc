@@ -65,6 +65,7 @@ int main()
 	typedef stx::CBTreeDB<> cbtreedb;
 
 	assert(cbtreedb::BTreePageSize == 1024);
+	//assert(sizeof(cbtreedb::LeafNode) == 1024);
 	assert(cbtreedb::LeafNodeNumKeys == 126);
 	assert(cbtreedb::LeafNodeFiller == 0);
 	assert(cbtreedb::InnerNodeNumKeys == 254);
@@ -74,6 +75,7 @@ int main()
 	typedef stx::CBTreeDB<uint64_t> cbtreedb;
 
 	assert(cbtreedb::BTreePageSize == 1024);
+	//assert(sizeof(cbtreedb::LeafNode) == 1024);
 	assert(cbtreedb::LeafNodeNumKeys == 84);
 	assert(cbtreedb::LeafNodeFiller == 0);
 	assert(cbtreedb::InnerNodeNumKeys == 127);
@@ -83,6 +85,7 @@ int main()
 	typedef stx::CBTreeDB<uint64_t, std::less<uint64_t>, 2048> cbtreedb;
 
 	assert(cbtreedb::BTreePageSize == 2048);
+	//assert(sizeof(cbtreedb::LeafNode) == 2048);
 	assert(cbtreedb::LeafNodeNumKeys == 169);
 	assert(cbtreedb::LeafNodeFiller == 4);
 	assert(cbtreedb::InnerNodeNumKeys == 255);
