@@ -23,7 +23,7 @@
 /** \mainpage stx::CBTreeDB - STX Constant B-Tree Database Template Classes README
 
 \author Timo Bingmann (Mail: tb a-with-circle idlebox dot net)
-\date 2010-04-09
+\date 2010-04-14
 
 \section sec_summary Summary
 
@@ -47,7 +47,7 @@ Key features of the database classes are:
 - O(1) page cache to keep hot pages in memory
 - simple C++ API for \ref stx::CBTreeDB::Reader "Reader" and two \ref stx::CBTreeDB::Writer "Writer" classes
 - CRC32 checksum of header and SHA256 digest of b-tree and value data for integrity
-- extensive test suite with 91.3% coverage
+- extensive test suite with 91.3% line coverage
 
 The complete source code is contained in the header file
 include/stx-cbtreedb.h.
