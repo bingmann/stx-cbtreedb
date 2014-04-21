@@ -1,5 +1,4 @@
 // -*- mode: c++; fill-column: 79 -*-
-// $Id$
 
 /** \file stx-cbtreedb.h
  * Contains all classes of the constant B-tree database implementation.
@@ -873,7 +872,8 @@ protected:
 	uint16_t GetLevel() const
 	{
 	    CBTREEDB_ASSERT(m_impl);
-	    return reinterpret_cast<InnerNode*>(m_impl->data)->level;
+            const InnerNode* n = reinterpret_cast<const InnerNode*>(m_impl->data);
+	    return n->level;
 	}
 
 	/// Returns true if the buffer contains a leaf node.
